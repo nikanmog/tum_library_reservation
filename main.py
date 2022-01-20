@@ -1,7 +1,10 @@
+import datetime
+import time
 import requests
 from bs4 import BeautifulSoup
 
 LIBRARY = "Main Campus"
+HEADER = {"Cookie": "GET FROM WEBSITE BY INSPECTING A POST REQUEST"}
 FORM_DATA = {
     "form_build_id": "GET FROM WEBSITE BY INSPECTING A POST REQUEST",
     "form_id": "registration_form",
@@ -16,23 +19,41 @@ FORM_DATA = {
     "op": "Anmelden",
     "homepage": None
 }
-HEADERS = {'Cookie': 'YOUR VALUE'}
-BASE_URL = "https://www.ub.tum.de/en/reserve-study-desks"
+BASE_URL = "https://www.ub.tum.de"
 
-page = requests.get(BASE_URL)
-soup = BeautifulSoup(page.content, "html.parser")
 
-results = soup.find_all("td", class_="views-field views-field-field-teilbibliothek")
-links = soup.find_all("td", class_="views-field views-field-views-conditional internlink")
+def book_seat() -> bool:
+    is_seat_booked = False
+    raw_page = requests.get(BASE_URL + "/en/reserve-study-desks")
+    bs_page = BeautifulSoup(raw_page.content, "html.parser")
 
-positions = [i for i, x in enumerate(results) if x.text.strip() == LIBRARY]
+    libraries = bs_page.find_all("td", class_="views-field views-field-field-teilbibliothek")
+    reservation_links = bs_page.find_all("td", class_="views-field views-field-views-conditional internlink")
+    lib_indexes = [index for index, library in enumerate(libraries) if library.text.strip() == LIBRARY]
 
-for index in positions:
-    if links[index].text.strip() != "ausgebucht":
-        reservation_id = links[index].find("a")['href'].split("/")[-1]
-        url = "https://www.ub.tum.de/reserve/" + reservation_id
-        print(f"Requesting: {url}")
-        response = requests.request("POST", url, headers=HEADERS, data=FORM_DATA)
-        print(response.headers)
-    else:
-        print(f"There are no more seats for: {results[index].text.strip()}")
+    for index in lib_indexes:
+        if reservation_links[index].text.strip() != "ausgebucht":
+            reservation_id = reservation_links[index].find("a")['href'].split("/")[-1]
+            url = BASE_URL + "/reserve/" + reservation_id
+            print(f"Requesting: {url} at: {datetime.datetime.now()}")
+            response = requests.request("POST", url=url, headers=HEADER, data=FORM_DATA)
+            print(response.headers)
+            is_seat_booked = True
+        else:
+            print(f"There are no more seats for: {libraries[index].text.strip()} at: {datetime.datetime.now()}")
+    return is_seat_booked
+
+
+def time_until_execution():
+    dt = datetime.datetime.now()
+    delta = ((9 - dt.hour - 1) * 60 * 60) + ((60 - dt.minute - 1) * 60) + (60 - dt.second)
+    return delta if delta >= 0 else 86400 - delta
+
+
+print(f"Will run in {time_until_execution()}")
+time.sleep(time_until_execution() - 1)
+for i in range(10):
+    time.sleep(2)
+    print("Sending Request")
+    if book_seat():
+        break
