@@ -5,6 +5,16 @@ from bs4 import BeautifulSoup
 
 LIBRARY = "Main Campus"
 HEADER = {"Cookie": "GET FROM WEBSITE BY INSPECTING A POST REQUEST"}
+captcha_1 = {
+    "captcha_sid": 1234,
+    "captcha_token": "1234",
+    "captcha_response": "1234"
+}
+captcha_2 = {
+    "captcha_sid": 1234,
+    "captcha_token": "1234",
+    "captcha_response": "1234"
+}
 FORM_DATA = {
     "form_build_id": "GET FROM WEBSITE BY INSPECTING A POST REQUEST",
     "form_id": "registration_form",
@@ -30,12 +40,14 @@ def book_seat() -> bool:
     libraries = bs_page.find_all("td", class_="views-field views-field-field-teilbibliothek")
     reservation_links = bs_page.find_all("td", class_="views-field views-field-views-conditional internlink")
     lib_indexes = [index for index, library in enumerate(libraries) if library.text.strip() == LIBRARY]
-
+    captcha_switch = 0
     for index in lib_indexes:
         if reservation_links[index].text.strip() != "ausgebucht":
             reservation_id = reservation_links[index].find("a")['href'].split("/")[-1]
             url = BASE_URL + "/reserve/" + reservation_id
             print(f"Requesting: {url} at: {datetime.datetime.now()}")
+            FORM_DATA.update(captcha_1 if captcha_switch % 2 == 0 else captcha_2)
+            captcha_switch += 1
             response = requests.request("POST", url=url, headers=HEADER, data=FORM_DATA)
             print(response.headers)
             is_seat_booked = True
