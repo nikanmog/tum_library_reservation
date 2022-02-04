@@ -37,33 +37,41 @@ FORM_DATA = {
 BASE_URL = "https://www.ub.tum.de"
 
 
-def book_seat() -> bool:
+def get_reservation_urls() -> list[str]:
     raw_page = requests.get(BASE_URL + "/en/reserve-study-desks")
     bs_page = BeautifulSoup(raw_page.content, "html.parser")
 
     libraries = bs_page.find_all("td", class_="views-field views-field-field-teilbibliothek")
     reservation_links = bs_page.find_all("td", class_="views-field views-field-views-conditional internlink")
     lib_indexes = [index for index, library in enumerate(libraries) if library.text.strip() == LIBRARY]
-    async_list = []
+
+    reservation_urls = []
     for index in lib_indexes:
         if reservation_links[index].text.strip() != "ausgebucht":
             reservation_id = reservation_links[index].find("a")['href'].split("/")[-1]
             url = BASE_URL + "/en/reserve/" + reservation_id
-            FORM_DATA.update(captcha[len(async_list)])
-            async_list.append(grequests.post(url=url, headers=HEADER, data=FORM_DATA))
-        else:
-            print(f"There are no more seats for: {libraries[index].text.strip()} at: {datetime.datetime.now()}")
+            reservation_urls.append(url)
+    print(f"Reservation URLs: {reservation_urls}")
+    return reservation_urls
 
+
+def create_requests(reservation_urls: list[str]) -> list[grequests.post]:
+    request_list = []
+    for url in reservation_urls:
+        FORM_DATA.update(captcha[len(request_list)])
+        request_list.append(grequests.post(url=url, headers=HEADER, data=FORM_DATA))
+    return request_list
+
+
+def send_requests(request_list: list[grequests.post]) -> int:
     successful_bookings = 0
-    while successful_bookings < len(async_list):
-        for resp in grequests.imap(async_list, len(async_list)):
-            link = resp.headers.get("Link")
-            print(f"Requesting {link}")
-            if "confirmation" in link:
-                print(f"Success {successful_bookings}")
-                successful_bookings += 1
-
-    return successful_bookings == len(async_list)
+    for resp in grequests.imap(request_list, len(request_list)):
+        link = resp.headers.get("Link")
+        print(f"Requesting {link}")
+        if link and "confirmation" in link:
+            print(f"Success {successful_bookings}")
+            successful_bookings += 1
+    return successful_bookings
 
 
 def time_until_execution():
@@ -72,13 +80,24 @@ def time_until_execution():
     return delta if delta >= 0 else 86400 - delta
 
 
-print(f"Will run in {time_until_execution()}")
-time.sleep(time_until_execution())
-for i in range(3600):
-    print("Sending Request")
-    try:
-        if book_seat():
-            break
-    except Exception as e:
-        print(e)
-    time.sleep(1)
+def main():
+    print(f"Will run in {time_until_execution()}")
+    time.sleep(time_until_execution())
+    reservation_urls = []
+
+    for i in range(3600):
+        try:
+            reservation_urls = get_reservation_urls()
+            if len(reservation_urls) > 0:
+                break
+        except Exception as e:
+            print(e)
+        time.sleep(1)
+    request_list = create_requests(reservation_urls)
+    successful_bookings = 0
+    while successful_bookings < len(request_list):
+        successful_bookings += send_requests(request_list)
+
+
+if __name__ == "__main__":
+    main()
