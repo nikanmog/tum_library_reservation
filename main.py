@@ -6,7 +6,6 @@ import requests
 from bs4 import BeautifulSoup
 
 LIBRARY = "Main Campus"
-HEADER = {"Cookie": "GET FROM WEBSITE BY INSPECTING A POST REQUEST"}
 captcha = [
     {
         "captcha_sid": 1,
@@ -59,7 +58,7 @@ def create_requests(reservation_urls: list[str]) -> list[grequests.post]:
     request_list = []
     for url in reservation_urls:
         FORM_DATA.update(captcha[len(request_list)])
-        request_list.append(grequests.post(url=url, headers=HEADER, data=FORM_DATA))
+        request_list.append(grequests.post(url=url, data=FORM_DATA))
     return request_list
 
 
